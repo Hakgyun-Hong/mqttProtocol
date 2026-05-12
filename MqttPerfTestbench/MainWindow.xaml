@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MqttPerfTestbench.ViewModels"
         mc:Ignorable="d"
-        Title="MQTT Performance Testbench" Height="600" Width="800"
+        Title="Multi-Protocol Pipeline Testbench" Height="750" Width="950"
         Background="#1E1E1E" Foreground="White"
         WindowStartupLocation="CenterScreen">
     <Window.DataContext>
@@ -13,7 +13,6 @@
     </Window.DataContext>
     
     <Window.Resources>
-        <!-- Styles for modern look -->
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="#E0E0E0"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
@@ -21,6 +20,17 @@
         <Style TargetType="Label">
             <Setter Property="Foreground" Value="#A0A0A0"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="Padding" Value="0,0,0,2"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#2D2D30"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
         </Style>
         <Style TargetType="Button">
             <Setter Property="Background" Value="#007ACC"/>
@@ -39,13 +49,6 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#2D2D30"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#3F3F46"/>
-            <Setter Property="Padding" Value="5"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="20">
@@ -56,47 +59,80 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <TextBlock Grid.Row="0" Text="MQTT High-Performance Transmission Testbench" 
+        <TextBlock Grid.Row="0" Text="High-Performance Data Pipeline &amp; Protocol Testbench" 
                    FontSize="24" FontWeight="Bold" Margin="0,0,0,20" Foreground="#007ACC"/>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="320"/>
                 <ColumnDefinition Width="20"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Configuration Panel -->
+            <!-- Column 1: Pipeline & Transport Config -->
             <Border Grid.Column="0" Background="#252526" CornerRadius="8" Padding="15">
                 <StackPanel>
-                    <TextBlock Text="Configuration" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,15"/>
+                    <TextBlock Text="1. Pipeline Setup" FontSize="16" FontWeight="SemiBold" Foreground="#4CAF50" Margin="0,0,0,10"/>
 
-                    <Label Content="Target FPS (1-60)"/>
-                    <TextBox Text="{Binding TargetFps, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
+                    <Label Content="Image Size (MB)"/>
+                    <TextBox Text="{Binding PayloadSizeMb, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <Label Content="Payload Size (MB)"/>
-                    <TextBox Text="{Binding PayloadSizeMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
-
-                    <Label Content="Chunk Size (MB) (0 for No Chunking)"/>
-                    <TextBox Text="{Binding ChunkSizeMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
-
-                    <Label Content="QoS Level (0, 1, 2)"/>
-                    <TextBox Text="{Binding Qos, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,20"/>
-
-                    <Border BorderBrush="#3F3F46" BorderThickness="0,1,0,0" Margin="0,0,0,15" Padding="0,15,0,0">
-                        <StackPanel>
-                            <TextBlock Text="Advanced Tuning" FontSize="14" FontWeight="SemiBold" Foreground="#007ACC" Margin="0,0,0,10"/>
-                            
-                            <CheckBox Content="TCP NoDelay (Disable Nagle)" IsChecked="{Binding TcpNoDelay}" Foreground="White" Margin="0,0,0,10"/>
-                            <CheckBox Content="Parallel Chunk Publishing" IsChecked="{Binding ParallelChunkPublish}" Foreground="White" Margin="0,0,0,10"/>
-
-                            <Label Content="Socket Buffer Size (MB)"/>
-                            <TextBox Text="{Binding SocketBufferSizeMb, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
-
-                            <Label Content="Max Pending Messages (Broker Queue)"/>
-                            <TextBox Text="{Binding MaxPendingMessages, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,20"/>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <Label Content="Width"/>
+                            <TextBox Text="{Binding ImageWidth, UpdateSourceTrigger=PropertyChanged}" Margin="0"/>
                         </StackPanel>
-                    </Border>
+                        <StackPanel Grid.Column="2">
+                            <Label Content="Height"/>
+                            <TextBox Text="{Binding ImageHeight, UpdateSourceTrigger=PropertyChanged}" Margin="0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Label Content="DQCM Predictor (2D requires Width)"/>
+                    <ComboBox ItemsSource="{Binding Predictors}" SelectedItem="{Binding SelectedPredictor}" DisplayMemberPath="Name"/>
+
+                    <Label Content="Compressor"/>
+                    <ComboBox ItemsSource="{Binding Compressors}" SelectedItem="{Binding SelectedCompressor}" DisplayMemberPath="Name"/>
+
+                    <Label Content="Compression Level (0-9)"/>
+                    <TextBox Text="{Binding CompressionLevel, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Text="2. Transport Setup" FontSize="16" FontWeight="SemiBold" Foreground="#2196F3" Margin="0,15,0,10"/>
+                    
+                    <Label Content="Protocol"/>
+                    <ComboBox ItemsSource="{Binding Protocols}" SelectedItem="{Binding SelectedProtocol}"/>
+
+                    <Label Content="Target FPS (1-120)"/>
+                    <TextBox Text="{Binding TargetFps, UpdateSourceTrigger=PropertyChanged}"/>
+                    
+                    <Label Content="Chunk Size (MB) (0 for No Chunking)"/>
+                    <TextBox Text="{Binding ChunkSizeMb, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Column 2: Advanced Tuning & Controls -->
+            <Border Grid.Column="2" Background="#252526" CornerRadius="8" Padding="15">
+                <StackPanel>
+                    <TextBlock Text="3. Advanced Tuning" FontSize="16" FontWeight="SemiBold" Foreground="#FF9800" Margin="0,0,0,15"/>
+                    
+                    <CheckBox Content="TCP NoDelay (Disable Nagle)" IsChecked="{Binding TcpNoDelay}" Foreground="White" Margin="0,0,0,10"/>
+                    <CheckBox Content="Parallel Chunk Publishing" IsChecked="{Binding ParallelChunkPublish}" Foreground="White" Margin="0,0,0,15"/>
+
+                    <Label Content="TCP/ZMQ Socket Buffer Size (MB)"/>
+                    <TextBox Text="{Binding SocketBufferSizeMb, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <Label Content="MQTT/ZMQ High Watermark / Queue limit"/>
+                    <TextBox Text="{Binding MaxPendingMessages, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <Label Content="MQTT QoS Level (0, 1, 2)"/>
+                    <TextBox Text="{Binding Qos, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,30"/>
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -110,36 +146,51 @@
                 </StackPanel>
             </Border>
 
-            <!-- Metrics Panel -->
-            <Border Grid.Column="2" Background="#252526" CornerRadius="8" Padding="20">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            <!-- Column 3: Real-Time Metrics -->
+            <Border Grid.Column="4" Background="#252526" CornerRadius="8" Padding="15">
+                <StackPanel>
+                    <TextBlock Text="Real-Time Metrics" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,20"/>
 
-                    <TextBlock Grid.Row="0" Text="Real-Time Metrics" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,20"/>
+                    <!-- Pipeline Stats -->
+                    <Border BorderBrush="#3F3F46" BorderThickness="0,0,0,1" Margin="0,0,0,15" Padding="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Pipeline Performance (Once)" Foreground="#A0A0A0" Margin="0,0,0,5"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <TextBlock Text="Prediction:" Width="90"/>
+                                <TextBlock Text="{Binding PredictionTimeMs, StringFormat={}{0:F2} ms}" FontWeight="Bold"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <TextBlock Text="Compression:" Width="90"/>
+                                <TextBlock Text="{Binding CompressionTimeMs, StringFormat={}{0:F2} ms}" FontWeight="Bold"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <TextBlock Text="Comp. Size:" Width="90"/>
+                                <TextBlock Text="{Binding CompressedSizeMb, StringFormat={}{0:F2} MB}" FontWeight="Bold" Foreground="#4CAF50"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Actual FPS:" FontSize="20" Foreground="#A0A0A0" Width="150"/>
-                        <TextBlock Text="{Binding CurrentFps, StringFormat={}{0:F1}}" FontSize="36" FontWeight="Bold" Foreground="#4CAF50"/>
-                        <TextBlock Text=" fps" FontSize="20" Foreground="#A0A0A0" Margin="10,12,0,0"/>
+                    <!-- Network Stats -->
+                    <TextBlock Text="Network Performance (Live)" Foreground="#A0A0A0" Margin="0,0,0,10"/>
+                    
+                    <TextBlock Text="Actual FPS" FontSize="14" Foreground="#A0A0A0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="{Binding CurrentFps, StringFormat={}{0:F1}}" FontSize="32" FontWeight="Bold" Foreground="#4CAF50"/>
+                        <TextBlock Text=" fps" FontSize="16" Foreground="#A0A0A0" Margin="5,12,0,0"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Bandwidth:" FontSize="20" Foreground="#A0A0A0" Width="150"/>
-                        <TextBlock Text="{Binding CurrentBandwidthMb, StringFormat={}{0:F2}}" FontSize="36" FontWeight="Bold" Foreground="#2196F3"/>
-                        <TextBlock Text=" MB/s" FontSize="20" Foreground="#A0A0A0" Margin="10,12,0,0"/>
+                    <TextBlock Text="Bandwidth" FontSize="14" Foreground="#A0A0A0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="{Binding CurrentBandwidthMb, StringFormat={}{0:F2}}" FontSize="32" FontWeight="Bold" Foreground="#2196F3"/>
+                        <TextBlock Text=" MB/s" FontSize="16" Foreground="#A0A0A0" Margin="5,12,0,0"/>
                     </StackPanel>
 
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Latency:" FontSize="20" Foreground="#A0A0A0" Width="150"/>
-                        <TextBlock Text="{Binding AverageLatencyMs, StringFormat={}{0:F2}}" FontSize="36" FontWeight="Bold" Foreground="#FF9800"/>
-                        <TextBlock Text=" ms" FontSize="20" Foreground="#A0A0A0" Margin="10,12,0,0"/>
+                    <TextBlock Text="Network Latency" FontSize="14" Foreground="#A0A0A0"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding AverageLatencyMs, StringFormat={}{0:F2}}" FontSize="32" FontWeight="Bold" Foreground="#FF9800"/>
+                        <TextBlock Text=" ms" FontSize="16" Foreground="#A0A0A0" Margin="5,12,0,0"/>
                     </StackPanel>
-                </Grid>
+                </StackPanel>
             </Border>
         </Grid>
 

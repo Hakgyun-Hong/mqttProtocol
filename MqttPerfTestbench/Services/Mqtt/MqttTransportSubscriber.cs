@@ -5,20 +5,21 @@ using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client;
 using MqttPerfTestbench.Models;
+using MqttPerfTestbench.Models.Interfaces;
 
-namespace MqttPerfTestbench.Services;
+namespace MqttPerfTestbench.Services.Mqtt;
 
-public class MqttSubscriberService
+public class MqttTransportSubscriber : ITransportSubscriber
 {
     private IMqttClient? _mqttClient;
     private readonly PerfMetrics _metrics;
 
-    public MqttSubscriberService(PerfMetrics metrics)
+    public MqttTransportSubscriber(PerfMetrics metrics)
     {
         _metrics = metrics;
     }
 
-    public async Task ConnectAsync(string server, int port, bool tcpNoDelay = true, int bufferSize = 16 * 1024 * 1024)
+    public async Task ConnectAsync(TransportOptions options)
     {
         var mqttFactory = new MqttFactory();
         _mqttClient = mqttFactory.CreateMqttClient();
@@ -26,10 +27,10 @@ public class MqttSubscriberService
         var mqttClientOptions = new MqttClientOptionsBuilder()
             .WithTcpServer(o =>
             {
-                o.Server = server;
-                o.Port = port;
-                o.NoDelay = tcpNoDelay;
-                o.BufferSize = bufferSize;
+                o.Server = options.Server;
+                o.Port = options.Port;
+                o.NoDelay = options.TcpNoDelay;
+                o.BufferSize = options.BufferSizeMb * 1024 * 1024;
             })
             .Build();
 
@@ -38,11 +39,8 @@ public class MqttSubscriberService
             var payload = e.ApplicationMessage.Payload;
             if (payload != null && payload.Length >= 16)
             {
-                // Read timestamp (8 bytes)
                 long startTimestamp = BitConverter.ToInt64(payload, 0);
                 long currentTimestamp = Stopwatch.GetTimestamp();
-                
-                // Calculate latency in ms
                 double latencyMs = (currentTimestamp - startTimestamp) * 1000.0 / Stopwatch.Frequency;
                 
                 _metrics.AddFrame(payload.Length, (long)latencyMs);
@@ -58,11 +56,6 @@ public class MqttSubscriberService
             .Build();
 
         await _mqttClient.SubscribeAsync(mqttSubscribeOptions, CancellationToken.None);
-    }
-
-    public void ResetMetrics()
-    {
-        _metrics.Reset();
     }
 
     public async Task DisconnectAsync()
