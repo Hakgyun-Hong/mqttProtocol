@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Threading;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MqttPerfTestbench.Models;
@@ -14,6 +14,7 @@ using MqttPerfTestbench.Services.Grpc;
 using MqttPerfTestbench.Services.Mqtt;
 using MqttPerfTestbench.Services.Tcp;
 using MqttPerfTestbench.Services.Zmq;
+using MqttPerfTestbench.Services;
 
 namespace MqttPerfTestbench.ViewModels;
 
@@ -31,7 +32,7 @@ public partial class MainViewModel : ObservableObject
     private DateTime _lastTime;
 
     // Collections
-    public ObservableCollection<string> Protocols { get; } = new(new[] { "MQTT", "ZMQ", "gRPC", "TCP" });
+    public ObservableCollection<string> Protocols { get; } = new(new[] { "MQTT", "ZMQ", "gRPC", "TCP", "UDP" });
     public ObservableCollection<IDqcmPredictor> Predictors { get; } = new(new IDqcmPredictor[] { new DqcmNonePredictor(), new DqcmLeftPredictor(), new DqcmTopPredictor() });
     public ObservableCollection<IBlockCompressor> Compressors { get; } = new(new IBlockCompressor[] { new NoneCompressor(), new Lz4Compressor(), new ZstdCompressor(), new LzwCompressor() });
 
@@ -90,9 +91,13 @@ public partial class MainViewModel : ObservableObject
 
         if (elapsedSeconds > 0)
         {
+            // FPS = (현재까지 전송된 총 프레임 수 - 마지막 측정 시점의 총 프레임 수) / 경과 시간(초)
             CurrentFps = (currentFrames - _lastFrames) / elapsedSeconds;
             
-            // Bandwidth in MB/s
+            // 대역폭(MB/s) 계산:
+            // 1. (현재까지 전송된 총 바이트 수 - 마지막 측정 시점의 총 바이트 수) = 해당 기간 동안 전송된 바이트
+            // 2. 위 값을 경과 시간(초)으로 나누어 초당 바이트(Bytes/s)를 구함
+            // 3. 1024 * 1024 (1 MiB)로 나누어 MB/s 단위로 변환
             double bytesPerSec = (currentBytes - _lastBytes) / elapsedSeconds;
             CurrentBandwidthMb = bytesPerSec / (1024 * 1024);
         }
@@ -124,6 +129,10 @@ public partial class MainViewModel : ObservableObject
                 _publisher = new TcpTransportPublisher();
                 _subscriber = new TcpTransportSubscriber(_metrics);
                 break;
+            case "UDP":
+                _publisher = new Services.Udp.UdpTransportPublisher();
+                _subscriber = new Services.Udp.UdpTransportSubscriber(_metrics);
+                break;
         }
     }
 
@@ -131,6 +140,10 @@ public partial class MainViewModel : ObservableObject
     private async Task StartTestAsync()
     {
         if (IsRunning) return;
+        
+        // gRPC unencrypted support for HTTP/2
+        AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+        
         IsRunning = true; // prevent double click
 
         try
@@ -175,8 +188,30 @@ public partial class MainViewModel : ObservableObject
             MemoryBufferPool.Return(rawData); // We are done with rawData
 
             // Pipeline: 4. Transport Setup
-            if (_subscriber != null) await _subscriber.ConnectAsync(options);
-            if (_publisher != null) await _publisher.ConnectAsync(options);
+            if (SelectedProtocol == "TCP" || SelectedProtocol == "ZMQ")
+            {
+                // Publisher is the Listener/Server for these protocols in current impl.
+                // Subscriber is the Connector/Client.
+                // Start Listener first, but Publisher.ConnectAsync for TCP blocks on AcceptAsync.
+                var pubConnectTask = _publisher!.ConnectAsync(options);
+                
+                // Give listener a moment to bind
+                await Task.Delay(500); 
+                
+                await _subscriber!.ConnectAsync(options);
+                await pubConnectTask;
+            }
+            else if (SelectedProtocol == "UDP")
+            {
+                // UDP Subscriber Binds first
+                await _subscriber!.ConnectAsync(options);
+                await _publisher!.ConnectAsync(options);
+            }
+            else // MQTT, gRPC
+            {
+                if (_subscriber != null) await _subscriber.ConnectAsync(options);
+                if (_publisher != null) await _publisher.ConnectAsync(options);
+            }
 
             // Reset metrics
             _metrics.Reset();
@@ -192,8 +227,8 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             IsRunning = false;
-            // Handle error in real app
-            Console.WriteLine(ex);
+            System.Diagnostics.Debug.WriteLine($"Test failed: {ex}");
+            // Optional: you can show a message box here if needed.
         }
     }
 

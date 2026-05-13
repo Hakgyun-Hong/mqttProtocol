@@ -24,7 +24,7 @@ public class MqttTransportPublisher : ITransportPublisher
                 o.Server = options.Server;
                 o.Port = options.Port;
                 o.NoDelay = options.TcpNoDelay;
-                o.BufferSize = options.BufferSizeMb * 1024 * 1024;
+                // o.BufferSize = options.BufferSizeMb * 1024 * 1024;
             })
             .Build();
 

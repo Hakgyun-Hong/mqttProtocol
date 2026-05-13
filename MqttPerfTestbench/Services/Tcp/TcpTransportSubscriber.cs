@@ -24,7 +24,11 @@ public class TcpTransportSubscriber : ITransportSubscriber
     {
         _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         _socket.NoDelay = options.TcpNoDelay;
-        _socket.ReceiveBufferSize = options.BufferSizeMb * 1024 * 1024;
+        try 
+        {
+            _socket.ReceiveBufferSize = options.BufferSizeMb * 1024 * 1024;
+        }
+        catch { /* OS limit reached */ }
 
         // Try connect with retry since Publisher (Listener) might be starting up
         for (int i = 0; i < 5; i++)

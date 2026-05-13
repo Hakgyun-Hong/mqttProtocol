@@ -18,7 +18,11 @@ public class TcpTransportPublisher : ITransportPublisher
     {
         _listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         _listener.NoDelay = options.TcpNoDelay;
-        _listener.SendBufferSize = options.BufferSizeMb * 1024 * 1024;
+        try 
+        {
+            _listener.SendBufferSize = options.BufferSizeMb * 1024 * 1024;
+        }
+        catch { /* OS limit reached */ }
         
         _listener.Bind(new IPEndPoint(IPAddress.Parse(options.Server), options.Port));
         _listener.Listen(1);

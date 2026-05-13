@@ -1,55 +1,58 @@
-<Window x:Class="MqttPerfTestbench.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:MqttPerfTestbench.ViewModels"
-        mc:Ignorable="d"
-        Title="Multi-Protocol Pipeline Testbench" Height="750" Width="950"
+        xmlns:local="clr-namespace:MqttPerfTestbench"
+        xmlns:vm="clr-namespace:MqttPerfTestbench.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="950" d:DesignHeight="750"
+        x:Class="MqttPerfTestbench.MainWindow"
+        Title="Multi-Protocol Pipeline Testbench (Avalonia)" Height="750" Width="950"
         Background="#1E1E1E" Foreground="White"
         WindowStartupLocation="CenterScreen">
-    <Window.DataContext>
-        <local:MainViewModel />
-    </Window.DataContext>
-    
+
     <Window.Resources>
-        <Style TargetType="TextBlock">
+        <local:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+    </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="TextBlock">
             <Setter Property="Foreground" Value="#E0E0E0"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontFamily" Value="Inter, Segoe UI, sans-serif"/>
         </Style>
-        <Style TargetType="Label">
+        <Style Selector="Label">
             <Setter Property="Foreground" Value="#A0A0A0"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontFamily" Value="Inter, Segoe UI, sans-serif"/>
             <Setter Property="Padding" Value="0,0,0,2"/>
         </Style>
-        <Style TargetType="ComboBox">
+        <Style Selector="ComboBox">
             <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
         </Style>
-        <Style TargetType="TextBox">
+        <Style Selector="TextBox">
             <Setter Property="Background" Value="#2D2D30"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderBrush" Value="#3F3F46"/>
             <Setter Property="Padding" Value="5"/>
             <Setter Property="Margin" Value="0,0,0,10"/>
         </Style>
-        <Style TargetType="Button">
+        <Style Selector="Button">
             <Setter Property="Background" Value="#007ACC"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#0098FF"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#3E3E42"/>
-                    <Setter Property="Foreground" Value="#808080"/>
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
         </Style>
-    </Window.Resources>
+        <Style Selector="Button:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#0098FF"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3E3E42"/>
+            <Setter Property="Foreground" Value="#808080"/>
+        </Style>
+    </Window.Styles>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -73,48 +76,62 @@
 
             <!-- Column 1: Pipeline & Transport Config -->
             <Border Grid.Column="0" Background="#252526" CornerRadius="8" Padding="15">
-                <StackPanel>
-                    <TextBlock Text="1. Pipeline Setup" FontSize="16" FontWeight="SemiBold" Foreground="#4CAF50" Margin="0,0,0,10"/>
+                <ScrollViewer>
+                    <StackPanel>
+                        <TextBlock Text="1. Pipeline Setup" FontSize="16" FontWeight="SemiBold" Foreground="#4CAF50" Margin="0,0,0,10"/>
 
-                    <Label Content="Image Size (MB)"/>
-                    <TextBox Text="{Binding PayloadSizeMb, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Label Content="Image Size (MB)"/>
+                        <TextBox Text="{Binding PayloadSizeMb}"/>
 
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <Label Content="Width"/>
-                            <TextBox Text="{Binding ImageWidth, UpdateSourceTrigger=PropertyChanged}" Margin="0"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <Label Content="Height"/>
-                            <TextBox Text="{Binding ImageHeight, UpdateSourceTrigger=PropertyChanged}" Margin="0"/>
-                        </StackPanel>
-                    </Grid>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <Label Content="Width"/>
+                                <TextBox Text="{Binding ImageWidth}" Margin="0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <Label Content="Height"/>
+                                <TextBox Text="{Binding ImageHeight}" Margin="0"/>
+                            </StackPanel>
+                        </Grid>
 
-                    <Label Content="DQCM Predictor (2D requires Width)"/>
-                    <ComboBox ItemsSource="{Binding Predictors}" SelectedItem="{Binding SelectedPredictor}" DisplayMemberPath="Name"/>
+                        <Label Content="DQCM Predictor (2D requires Width)"/>
+                        <ComboBox ItemsSource="{Binding Predictors}" SelectedItem="{Binding SelectedPredictor}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
 
-                    <Label Content="Compressor"/>
-                    <ComboBox ItemsSource="{Binding Compressors}" SelectedItem="{Binding SelectedCompressor}" DisplayMemberPath="Name"/>
+                        <Label Content="Compressor"/>
+                        <ComboBox ItemsSource="{Binding Compressors}" SelectedItem="{Binding SelectedCompressor}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
 
-                    <Label Content="Compression Level (0-9)"/>
-                    <TextBox Text="{Binding CompressionLevel, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Label Content="Compression Level (0-9)"/>
+                        <TextBox Text="{Binding CompressionLevel}"/>
 
-                    <TextBlock Text="2. Transport Setup" FontSize="16" FontWeight="SemiBold" Foreground="#2196F3" Margin="0,15,0,10"/>
-                    
-                    <Label Content="Protocol"/>
-                    <ComboBox ItemsSource="{Binding Protocols}" SelectedItem="{Binding SelectedProtocol}"/>
+                        <TextBlock Text="2. Transport Setup" FontSize="16" FontWeight="SemiBold" Foreground="#2196F3" Margin="0,15,0,10"/>
+                        
+                        <Label Content="Protocol"/>
+                        <ComboBox ItemsSource="{Binding Protocols}" SelectedItem="{Binding SelectedProtocol}"/>
 
-                    <Label Content="Target FPS (1-120)"/>
-                    <TextBox Text="{Binding TargetFps, UpdateSourceTrigger=PropertyChanged}"/>
-                    
-                    <Label Content="Chunk Size (MB) (0 for No Chunking)"/>
-                    <TextBox Text="{Binding ChunkSizeMb, UpdateSourceTrigger=PropertyChanged}"/>
-                </StackPanel>
+                        <Label Content="Target FPS (1-120)"/>
+                        <TextBox Text="{Binding TargetFps}"/>
+                        
+                        <Label Content="Chunk Size (MB) (0 for No Chunking)"/>
+                        <TextBox Text="{Binding ChunkSizeMb}"/>
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
 
             <!-- Column 2: Advanced Tuning & Controls -->
@@ -126,13 +143,13 @@
                     <CheckBox Content="Parallel Chunk Publishing" IsChecked="{Binding ParallelChunkPublish}" Foreground="White" Margin="0,0,0,15"/>
 
                     <Label Content="TCP/ZMQ Socket Buffer Size (MB)"/>
-                    <TextBox Text="{Binding SocketBufferSizeMb, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Text="{Binding SocketBufferSizeMb}"/>
 
                     <Label Content="MQTT/ZMQ High Watermark / Queue limit"/>
-                    <TextBox Text="{Binding MaxPendingMessages, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBox Text="{Binding MaxPendingMessages}"/>
 
                     <Label Content="MQTT QoS Level (0, 1, 2)"/>
-                    <TextBox Text="{Binding Qos, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,30"/>
+                    <TextBox Text="{Binding Qos}" Margin="0,0,0,30"/>
 
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -140,7 +157,7 @@
                             <ColumnDefinition Width="10"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Content="Start Test" Command="{Binding StartTestCommand}" IsEnabled="{Binding IsRunning, Converter={x:Static local:InverseBooleanConverter.Instance}}"/>
+                        <Button Grid.Column="0" Content="Start Test" Command="{Binding StartTestCommand}" IsEnabled="{Binding !IsRunning}"/>
                         <Button Grid.Column="2" Content="Stop Test" Command="{Binding StopTestCommand}" IsEnabled="{Binding IsRunning}" Background="#D13438"/>
                     </Grid>
                 </StackPanel>
@@ -157,15 +174,15 @@
                             <TextBlock Text="Pipeline Performance (Once)" Foreground="#A0A0A0" Margin="0,0,0,5"/>
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                 <TextBlock Text="Prediction:" Width="90"/>
-                                <TextBlock Text="{Binding PredictionTimeMs, StringFormat={}{0:F2} ms}" FontWeight="Bold"/>
+                                <TextBlock Text="{Binding PredictionTimeMs, StringFormat=\{0:F2\} ms}" FontWeight="Bold"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                 <TextBlock Text="Compression:" Width="90"/>
-                                <TextBlock Text="{Binding CompressionTimeMs, StringFormat={}{0:F2} ms}" FontWeight="Bold"/>
+                                <TextBlock Text="{Binding CompressionTimeMs, StringFormat=\{0:F2\} ms}" FontWeight="Bold"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                 <TextBlock Text="Comp. Size:" Width="90"/>
-                                <TextBlock Text="{Binding CompressedSizeMb, StringFormat={}{0:F2} MB}" FontWeight="Bold" Foreground="#4CAF50"/>
+                                <TextBlock Text="{Binding CompressedSizeMb, StringFormat=\{0:F2\} MB}" FontWeight="Bold" Foreground="#4CAF50"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -175,19 +192,19 @@
                     
                     <TextBlock Text="Actual FPS" FontSize="14" Foreground="#A0A0A0"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <TextBlock Text="{Binding CurrentFps, StringFormat={}{0:F1}}" FontSize="32" FontWeight="Bold" Foreground="#4CAF50"/>
+                        <TextBlock Text="{Binding CurrentFps, StringFormat=\{0:F1\}}" FontSize="32" FontWeight="Bold" Foreground="#4CAF50"/>
                         <TextBlock Text=" fps" FontSize="16" Foreground="#A0A0A0" Margin="5,12,0,0"/>
                     </StackPanel>
 
                     <TextBlock Text="Bandwidth" FontSize="14" Foreground="#A0A0A0"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <TextBlock Text="{Binding CurrentBandwidthMb, StringFormat={}{0:F2}}" FontSize="32" FontWeight="Bold" Foreground="#2196F3"/>
+                        <TextBlock Text="{Binding CurrentBandwidthMb, StringFormat=\{0:F2\}}" FontSize="32" FontWeight="Bold" Foreground="#2196F3"/>
                         <TextBlock Text=" MB/s" FontSize="16" Foreground="#A0A0A0" Margin="5,12,0,0"/>
                     </StackPanel>
 
                     <TextBlock Text="Network Latency" FontSize="14" Foreground="#A0A0A0"/>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding AverageLatencyMs, StringFormat={}{0:F2}}" FontSize="32" FontWeight="Bold" Foreground="#FF9800"/>
+                        <TextBlock Text="{Binding AverageLatencyMs, StringFormat=\{0:F2\}}" FontSize="32" FontWeight="Bold" Foreground="#FF9800"/>
                         <TextBlock Text=" ms" FontSize="16" Foreground="#A0A0A0" Margin="5,12,0,0"/>
                     </StackPanel>
                 </StackPanel>
@@ -195,7 +212,7 @@
         </Grid>
 
         <!-- Status Bar -->
-        <TextBlock Grid.Row="2" Text="{Binding IsRunning, StringFormat='Status: {0}'}" 
+        <TextBlock Grid.Row="2" Text="{Binding IsRunning, StringFormat='Status: \{0\}'}" 
                    Margin="0,15,0,0" FontSize="14" Foreground="#808080"
                    HorizontalAlignment="Right"/>
     </Grid>

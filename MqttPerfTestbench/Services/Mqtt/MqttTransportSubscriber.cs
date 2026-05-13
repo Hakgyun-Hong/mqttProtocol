@@ -30,7 +30,8 @@ public class MqttTransportSubscriber : ITransportSubscriber
                 o.Server = options.Server;
                 o.Port = options.Port;
                 o.NoDelay = options.TcpNoDelay;
-                o.BufferSize = options.BufferSizeMb * 1024 * 1024;
+                // Cap buffer size for Mac/Linux if needed, or rely on defaults
+                // o.BufferSize = options.BufferSizeMb * 1024 * 1024; 
             })
             .Build();
 
