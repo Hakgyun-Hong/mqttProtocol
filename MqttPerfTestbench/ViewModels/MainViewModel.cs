@@ -15,6 +15,7 @@ using MqttPerfTestbench.Services.Mqtt;
 using MqttPerfTestbench.Services.Tcp;
 using MqttPerfTestbench.Services.Zmq;
 using MqttPerfTestbench.Services;
+using MqttPerfTestbench.Services.H265;
 
 namespace MqttPerfTestbench.ViewModels;
 
@@ -32,7 +33,7 @@ public partial class MainViewModel : ObservableObject
     private DateTime _lastTime;
 
     // Collections
-    public ObservableCollection<string> Protocols { get; } = new(new[] { "MQTT", "ZMQ", "gRPC", "TCP", "UDP" });
+    public ObservableCollection<string> Protocols { get; } = new(new[] { "MQTT", "ZMQ", "gRPC", "TCP", "UDP", "H.265" });
     public ObservableCollection<IDqcmPredictor> Predictors { get; } = new(new IDqcmPredictor[] { new DqcmNonePredictor(), new DqcmLeftPredictor(), new DqcmTopPredictor() });
     public ObservableCollection<IBlockCompressor> Compressors { get; } = new(new IBlockCompressor[] { new NoneCompressor(), new Lz4Compressor(), new ZstdCompressor(), new LzwCompressor() });
 
@@ -133,6 +134,10 @@ public partial class MainViewModel : ObservableObject
                 _publisher = new Services.Udp.UdpTransportPublisher();
                 _subscriber = new Services.Udp.UdpTransportSubscriber(_metrics);
                 break;
+            case "H.265":
+                _publisher = new H265TransportPublisher();
+                _subscriber = new H265TransportSubscriber(_metrics);
+                break;
         }
     }
 
@@ -153,14 +158,23 @@ public partial class MainViewModel : ObservableObject
             var options = new TransportOptions
             {
                 Server = "127.0.0.1",
-                Port = SelectedProtocol == "gRPC" ? 50051 : 1883,
+                Port = SelectedProtocol switch {
+                    "gRPC" => 50051,
+                    "H.265" => 9000,
+                    _ => 1883
+                },
                 Qos = Qos,
                 HighWatermark = MaxPendingMessages,
                 MaxMessageSizeMb = 100,
                 TcpNoDelay = TcpNoDelay,
                 BufferSizeMb = SocketBufferSizeMb,
                 ParallelChunkPublish = ParallelChunkPublish,
-                ChunkSizeMb = ChunkSizeMb
+                ChunkSizeMb = ChunkSizeMb,
+                Width = ImageWidth,
+                Height = ImageHeight,
+                UseGpu = false, // Set true manually for NVENC
+                Crf = 28,
+                FfmpegPath = OperatingSystem.IsMacOS() ? "/opt/homebrew/bin/ffmpeg" : "ffmpeg" 
             };
 
             // Start MQTT broker if needed
@@ -170,7 +184,9 @@ public partial class MainViewModel : ObservableObject
             }
 
             // Pipeline: 1. Generate Raw Data
-            int payloadBytes = PayloadSizeMb * 1024 * 1024;
+            int payloadBytes = SelectedProtocol == "H.265" 
+                ? ImageWidth * ImageHeight * 4 
+                : PayloadSizeMb * 1024 * 1024;
             byte[] rawData = MemoryBufferPool.Rent(payloadBytes);
             Array.Fill(rawData, (byte)128); // dummy gray image
 
@@ -206,6 +222,13 @@ public partial class MainViewModel : ObservableObject
                 // UDP Subscriber Binds first
                 await _subscriber!.ConnectAsync(options);
                 await _publisher!.ConnectAsync(options);
+            }
+            else if (SelectedProtocol == "H.265")
+            {
+                // H.265 Publisher is Listener (?listen=1), Subscriber is Connector
+                await _publisher!.ConnectAsync(options);
+                await Task.Delay(1000); // Wait for FFmpeg to start listening
+                await _subscriber!.ConnectAsync(options);
             }
             else // MQTT, gRPC
             {

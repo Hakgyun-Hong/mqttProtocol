@@ -25,6 +25,13 @@ public class TransportOptions
     // Chunking
     public bool ParallelChunkPublish { get; set; } = false;
     public int ChunkSizeMb { get; set; } = 4;
+    
+    // H.265 Specific
+    public int Width { get; set; } = 1920;
+    public int Height { get; set; } = 1080;
+    public bool UseGpu { get; set; } = false;
+    public int Crf { get; set; } = 28;
+    public string FfmpegPath { get; set; } = "ffmpeg";
 }
 
 public interface ITransportPublisher
