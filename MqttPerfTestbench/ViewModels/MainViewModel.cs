@@ -227,7 +227,7 @@ public partial class MainViewModel : ObservableObject
             {
                 // H.265 Publisher is Listener (?listen=1), Subscriber is Connector
                 await _publisher!.ConnectAsync(options);
-                await Task.Delay(1000); // Wait for FFmpeg to start listening
+                await Task.Delay(2000); // Wait longer for FFmpeg to start listening
                 await _subscriber!.ConnectAsync(options);
             }
             else // MQTT, gRPC

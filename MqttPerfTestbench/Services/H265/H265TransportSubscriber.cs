@@ -19,67 +19,84 @@ public class H265TransportSubscriber : ITransportSubscriber
         _metrics = metrics;
     }
 
-    public Task ConnectAsync(TransportOptions options)
+    public async Task ConnectAsync(TransportOptions options)
     {
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
 
-        string inputUrl = $"tcp://{options.Server}:{options.Port}";
-        string args = $"-i \"{inputUrl}\" -f rawvideo -pix_fmt bgra pipe:1";
-
-        var psi = new ProcessStartInfo
+        string inputUrl = $"tcp://127.0.0.1:{options.Port}";
+        
+        // Retry a few times in case the publisher isn't ready yet
+        bool started = false;
+        for (int i = 0; i < 5; i++)
         {
-            FileName = options.FfmpegPath,
-            Arguments = args,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-
-        try
-        {
-            _ffmpegProcess = new Process { StartInfo = psi };
-            _ffmpegProcess.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine($"[ffmpeg-sub] {e.Data}"); };
-            _ffmpegProcess.Start();
-            _ffmpegProcess.BeginErrorReadLine();
-            var stdout = _ffmpegProcess.StandardOutput.BaseStream;
-            Console.WriteLine($"FFmpeg Subscriber connecting to {inputUrl}");
-
-            Task.Run(async () =>
+            try
             {
-                int frameSize = options.Width * options.Height * 4;
-                byte[] buffer = new byte[frameSize];
+                string args = $"-fflags nobuffer -flags low_delay -i \"{inputUrl}\" -f rawvideo -pix_fmt bgra pipe:1";
 
-                try
+                var psi = new ProcessStartInfo
                 {
-                    while (!token.IsCancellationRequested && stdout != null)
-                    {
-                        int offset = 0;
-                        while (offset < frameSize)
-                        {
-                            int read = await stdout.ReadAsync(buffer.AsMemory(offset, frameSize - offset), token);
-                            if (read == 0) break;
-                            offset += read;
-                        }
+                    FileName = options.FfmpegPath,
+                    Arguments = args,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
 
-                        if (offset == frameSize)
+                _ffmpegProcess = new Process { StartInfo = psi };
+                _ffmpegProcess.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine($"[ffmpeg-sub] {e.Data}"); };
+                _ffmpegProcess.Start();
+                _ffmpegProcess.BeginErrorReadLine();
+                var stdout = _ffmpegProcess.StandardOutput.BaseStream;
+                
+                Console.WriteLine($"FFmpeg Subscriber connected to {inputUrl}");
+
+                Task.Run(async () =>
+                {
+                    int frameSize = options.Width * options.Height * 4;
+                    byte[] buffer = new byte[frameSize];
+
+                    try
+                    {
+                        while (!token.IsCancellationRequested && stdout != null)
                         {
-                            long startTimestamp = BitConverter.ToInt64(buffer, 0);
-                            long latency = (Stopwatch.GetTimestamp() - startTimestamp) * 1000 / Stopwatch.Frequency;
-                            _metrics.AddFrame(frameSize, latency);
+                            int offset = 0;
+                            while (offset < frameSize)
+                            {
+                                int read = await stdout.ReadAsync(buffer.AsMemory(offset, frameSize - offset), token);
+                                if (read == 0) break;
+                                offset += read;
+                            }
+
+                            if (offset == frameSize)
+                            {
+                                long startTimestamp = BitConverter.ToInt64(buffer, 0);
+                                long latency = (Stopwatch.GetTimestamp() - startTimestamp) * 1000 / Stopwatch.Frequency;
+                                _metrics.AddFrame(frameSize, latency);
+                            }
                         }
                     }
-                }
-                catch { /* Ignore */ }
-            }, token);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Failed to start FFmpeg Subscriber: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Subscriber loop error: {ex.Message}");
+                    }
+                }, token);
+
+                started = true;
+                break;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Subscriber connect attempt {i+1} failed: {ex.Message}");
+                await Task.Delay(1000, token);
+            }
         }
 
-        return Task.CompletedTask;
+        if (!started)
+        {
+            Console.WriteLine("FFmpeg Subscriber failed to start after multiple attempts.");
+        }
     }
 
     public async Task DisconnectAsync()

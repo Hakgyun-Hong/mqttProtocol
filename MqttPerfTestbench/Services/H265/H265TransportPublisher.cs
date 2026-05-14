@@ -12,10 +12,42 @@ public class H265TransportPublisher : ITransportPublisher
     private Process? _ffmpegProcess;
     private Stream? _ffmpegStdin;
     private CancellationTokenSource? _cts;
+    private TransportOptions? _options;
 
-    public Task ConnectAsync(TransportOptions options)
+    public async Task ConnectAsync(TransportOptions options)
     {
-        return Task.CompletedTask;
+        _options = options;
+        _cts = new CancellationTokenSource();
+        
+        // Start FFmpeg Listener immediately during connection phase
+        StartFfmpeg(options, 30); 
+        
+        // Kickstart FFmpeg: For high resolutions like 8K, FFmpeg needs a FULL frame (e.g., 256MB)
+        // to initialize the encoder and open the output port.
+        if (_ffmpegStdin != null)
+        {
+            try
+            {
+                long frameSize = (long)options.Width * options.Height * 4;
+                byte[] chunk = new byte[1024 * 1024]; // 1MB buffer to avoid huge allocation
+                
+                long sent = 0;
+                while (sent < frameSize)
+                {
+                    int toSend = (int)Math.Min(chunk.Length, frameSize - sent);
+                    await _ffmpegStdin.WriteAsync(chunk, 0, toSend);
+                    sent += toSend;
+                }
+                await _ffmpegStdin.FlushAsync();
+                Console.WriteLine($"FFmpeg Publisher kickstarted with full {frameSize} bytes dummy frame.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Kickstart failed: {ex.Message}");
+            }
+        }
+        
+        return;
     }
 
     public Task DisconnectAsync()
@@ -24,34 +56,30 @@ public class H265TransportPublisher : ITransportPublisher
         return Task.CompletedTask;
     }
 
-    public void StartPublishing(byte[] rawPayload, int targetFps, TransportOptions options)
+    private void StartFfmpeg(TransportOptions options, int targetFps)
     {
-        StopPublishing();
-        _cts = new CancellationTokenSource();
-        var token = _cts.Token;
+        if (_ffmpegProcess != null && !_ffmpegProcess.HasExited) return;
 
-        // OS optimized commands
         string codec = "libx265";
         string qualityParams = $"-preset ultrafast -tune zerolatency -crf {options.Crf} -x265-params \"keyint={targetFps}:min-keyint={targetFps}:scenecut=0:bframes=0:rc-lookahead=0\"";
 
         if (OperatingSystem.IsMacOS())
         {
-            // Mac VideoToolbox (Hardware Acceleration)
+            // Note: hevc_videotoolbox might have limits (usually 4K or 8K). 
+            // 8192x8192 is non-standard, libx265 is safer but slower.
             codec = "hevc_videotoolbox";
-            // -realtime true and -q:v 50 for good balance on Mac
             qualityParams = $"-realtime true -q:v 50 -allow_sw true"; 
         }
         else if (options.UseGpu)
         {
-            // Windows/Linux NVIDIA NVENC
             codec = "hevc_nvenc";
             qualityParams = $"-preset p1 -tune ll -rc vbr -cq {options.Crf} -bf 0 -g {targetFps}";
         }
 
-        string outputUrl = $"tcp://127.0.0.1:{options.Port}?listen=1";
+        string outputUrl = $"tcp://0.0.0.0:{options.Port}?listen=1";
         
-        string args = $"-y -f rawvideo -pix_fmt bgra -s {options.Width}x{options.Height} -r {targetFps} -i pipe:0 " +
-                      $"-an -c:v {codec} {qualityParams} -pix_fmt yuv420p -f matroska \"{outputUrl}\"";
+        string args = $"-y -fflags nobuffer -flags low_delay -f rawvideo -pix_fmt bgra -s {options.Width}x{options.Height} -r {targetFps} -i pipe:0 " +
+                      $"-an -c:v {codec} {qualityParams} -pix_fmt yuv420p -flush_packets 1 -f matroska \"{outputUrl}\"";
 
         var psi = new ProcessStartInfo
         {
@@ -75,8 +103,17 @@ public class H265TransportPublisher : ITransportPublisher
         catch (Exception ex)
         {
             Console.WriteLine($"Failed to start FFmpeg at {options.FfmpegPath}: {ex.Message}");
-            return;
         }
+    }
+
+    public void StartPublishing(byte[] rawPayload, int targetFps, TransportOptions options)
+    {
+        if (_ffmpegProcess == null || _ffmpegProcess.HasExited)
+        {
+            StartFfmpeg(options, targetFps);
+        }
+
+        var token = _cts?.Token ?? CancellationToken.None;
 
         Task.Run(async () =>
         {
@@ -86,13 +123,11 @@ public class H265TransportPublisher : ITransportPublisher
                 {
                     var sw = Stopwatch.StartNew();
                     
-                    // Inject timestamp for latency measurement
                     BitConverter.TryWriteBytes(rawPayload.AsSpan(0, 8), Stopwatch.GetTimestamp());
 
                     if (_ffmpegStdin != null)
                     {
-                        await _ffmpegStdin.WriteAsync(rawPayload, token);
-                        await _ffmpegStdin.FlushAsync(token);
+                        await _ffmpegStdin.WriteAsync(rawPayload.AsMemory(0, rawPayload.Length), token);
                     }
 
                     int delay = (int)(1000.0 / targetFps - sw.ElapsedMilliseconds);
