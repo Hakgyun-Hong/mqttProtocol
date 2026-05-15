@@ -5,9 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using MqttPerfTestbench.Models.Interfaces;
 
-namespace MqttPerfTestbench.Services.H265;
+namespace MqttPerfTestbench.Services.H264;
 
-public class H265TransportPublisher : ITransportPublisher
+public class H264TransportPublisher : ITransportPublisher
 {
     private Process? _ffmpegProcess;
     private Stream? _ffmpegStdin;
@@ -19,17 +19,15 @@ public class H265TransportPublisher : ITransportPublisher
         _options = options;
         _cts = new CancellationTokenSource();
         
-        // Start FFmpeg Listener immediately during connection phase
         StartFfmpeg(options, 30); 
         
-        // Kickstart FFmpeg: For high resolutions like 8K, FFmpeg needs a FULL frame.
-        // For grayscale, this is Width * Height * 1.
         if (_ffmpegStdin != null)
         {
             try
             {
+                // Grayscale Kickstart: Width * Height * 1
                 long frameSize = (long)options.Width * options.Height;
-                byte[] chunk = new byte[1024 * 1024]; 
+                byte[] chunk = new byte[1024 * 1024];
                 
                 long sent = 0;
                 while (sent < frameSize)
@@ -39,15 +37,13 @@ public class H265TransportPublisher : ITransportPublisher
                     sent += toSend;
                 }
                 await _ffmpegStdin.FlushAsync();
-                Console.WriteLine($"H.265 Publisher kickstarted with full {frameSize} bytes grayscale frame.");
+                Console.WriteLine($"H.264 Publisher kickstarted with {frameSize} bytes grayscale frame.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"H.265 Kickstart failed: {ex.Message}");
+                Console.WriteLine($"H.264 Kickstart failed: {ex.Message}");
             }
         }
-        
-        return;
     }
 
     public Task DisconnectAsync()
@@ -60,99 +56,69 @@ public class H265TransportPublisher : ITransportPublisher
     {
         if (_ffmpegProcess != null && !_ffmpegProcess.HasExited) return;
 
-        string codec = "libx265";
-        string qualityParams = $"-preset ultrafast -tune zerolatency -crf {options.Crf} -x265-params \"keyint={targetFps}:min-keyint={targetFps}:scenecut=0:bframes=0:rc-lookahead=0\"";
+        string codec = "libx264";
+        string qualityParams = $"-preset ultrafast -tune zerolatency -crf {options.Crf}";
 
         if (OperatingSystem.IsMacOS())
         {
-            // Note: hevc_videotoolbox might have limits (usually 4K or 8K). 
-            // 8192x8192 is non-standard, libx265 is safer but slower.
-            codec = "hevc_videotoolbox";
-            qualityParams = $"-realtime true -q:v 50 -allow_sw true"; 
+            codec = "h264_videotoolbox"; // Mac hardware H.264
+            qualityParams = "-realtime true -q:v 50";
         }
         else if (options.UseGpu)
         {
-            codec = "hevc_nvenc";
+            codec = "h264_nvenc";
             qualityParams = $"-preset p1 -tune ll -rc vbr -cq {options.Crf} -bf 0 -g {targetFps}";
         }
 
-        string outputUrl = $"tcp://0.0.0.0:{options.Port}?listen=1";
+        // Port 9001 for H.264 to avoid conflict with H.265(9000)
+        int port = options.Port == 9000 ? 9001 : options.Port;
+        string outputUrl = $"tcp://0.0.0.0:{port}?listen=1";
         
+        // Use -pix_fmt gray for 1-byte-per-pixel grayscale source (64MB for 8K)
         string args = $"-y -fflags nobuffer -flags low_delay -f rawvideo -pix_fmt gray -s {options.Width}x{options.Height} -r {targetFps} -i pipe:0 " +
-                      $"-an -c:v {codec} {qualityParams} -pix_fmt yuv420p -flush_packets 1 -f matroska \"{outputUrl}\"";
-
-        var psi = new ProcessStartInfo
-        {
-            FileName = options.FfmpegPath,
-            Arguments = args,
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
+                      $"-an -c:v {codec} {qualityParams} -flush_packets 1 -f matroska \"{outputUrl}\"";
 
         try
         {
-            _ffmpegProcess = new Process { StartInfo = psi };
-            _ffmpegProcess.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine($"[ffmpeg-pub] {e.Data}"); };
-            _ffmpegProcess.Start();
+            _ffmpegProcess = Process.Start(new ProcessStartInfo {
+                FileName = options.FfmpegPath, Arguments = args, UseShellExecute = false, 
+                RedirectStandardInput = true, RedirectStandardError = true, CreateNoWindow = true
+            });
+            _ffmpegProcess!.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine($"[h264-pub] {e.Data}"); };
             _ffmpegProcess.BeginErrorReadLine();
             _ffmpegStdin = _ffmpegProcess.StandardInput.BaseStream;
-            Console.WriteLine($"FFmpeg Publisher started with codec {codec} on {outputUrl}");
+            Console.WriteLine($"H.264 Publisher started on {outputUrl}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to start FFmpeg at {options.FfmpegPath}: {ex.Message}");
+            Console.WriteLine($"Failed to start H.264 FFmpeg: {ex.Message}");
         }
     }
 
     public void StartPublishing(byte[] rawPayload, int targetFps, TransportOptions options)
     {
-        if (_ffmpegProcess == null || _ffmpegProcess.HasExited)
-        {
-            StartFfmpeg(options, targetFps);
-        }
-
         var token = _cts?.Token ?? CancellationToken.None;
-
         Task.Run(async () =>
         {
             try
             {
-                while (!token.IsCancellationRequested)
+                while (!token.IsCancellationRequested && _ffmpegStdin != null)
                 {
                     var sw = Stopwatch.StartNew();
-                    
                     BitConverter.TryWriteBytes(rawPayload.AsSpan(0, 8), Stopwatch.GetTimestamp());
-
-                    if (_ffmpegStdin != null)
-                    {
-                        await _ffmpegStdin.WriteAsync(rawPayload.AsMemory(0, rawPayload.Length), token);
-                    }
-
+                    await _ffmpegStdin.WriteAsync(rawPayload, token);
                     int delay = (int)(1000.0 / targetFps - sw.ElapsedMilliseconds);
                     if (delay > 0) await Task.Delay(delay, token);
                 }
             }
-            catch { /* Ignore */ }
+            catch { }
         }, token);
     }
 
     public void StopPublishing()
     {
         _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = null;
-
-        try
-        {
-            if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
-            {
-                _ffmpegProcess.Kill(true);
-            }
-        }
-        catch { }
-        
+        try { if (_ffmpegProcess != null && !_ffmpegProcess.HasExited) _ffmpegProcess.Kill(true); } catch { }
         _ffmpegProcess?.Dispose();
         _ffmpegProcess = null;
         _ffmpegStdin = null;

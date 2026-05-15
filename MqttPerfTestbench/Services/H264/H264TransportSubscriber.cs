@@ -6,15 +6,15 @@ using System.Threading.Tasks;
 using MqttPerfTestbench.Models;
 using MqttPerfTestbench.Models.Interfaces;
 
-namespace MqttPerfTestbench.Services.H265;
+namespace MqttPerfTestbench.Services.H264;
 
-public class H265TransportSubscriber : ITransportSubscriber
+public class H264TransportSubscriber : ITransportSubscriber
 {
     private Process? _ffmpegProcess;
     private readonly PerfMetrics _metrics;
     private CancellationTokenSource? _cts;
 
-    public H265TransportSubscriber(PerfMetrics metrics)
+    public H264TransportSubscriber(PerfMetrics metrics)
     {
         _metrics = metrics;
     }
@@ -24,14 +24,14 @@ public class H265TransportSubscriber : ITransportSubscriber
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
 
-        string inputUrl = $"tcp://127.0.0.1:{options.Port}";
+        int port = options.Port == 9000 ? 9001 : options.Port;
+        string inputUrl = $"tcp://127.0.0.1:{port}";
         
-        // Retry a few times in case the publisher isn't ready yet
-        bool started = false;
         for (int i = 0; i < 5; i++)
         {
             try
             {
+                // Use pix_fmt gray for grayscale output
                 string args = $"-fflags nobuffer -flags low_delay -i \"{inputUrl}\" -f rawvideo -pix_fmt gray pipe:1";
 
                 var psi = new ProcessStartInfo
@@ -45,12 +45,12 @@ public class H265TransportSubscriber : ITransportSubscriber
                 };
 
                 _ffmpegProcess = new Process { StartInfo = psi };
-                _ffmpegProcess.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine($"[ffmpeg-sub] {e.Data}"); };
+                _ffmpegProcess.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.WriteLine($"[h264-sub] {e.Data}"); };
                 _ffmpegProcess.Start();
                 _ffmpegProcess.BeginErrorReadLine();
                 var stdout = _ffmpegProcess.StandardOutput.BaseStream;
                 
-                Console.WriteLine($"FFmpeg Subscriber connected to {inputUrl}");
+                Console.WriteLine($"H.264 Subscriber connected to {inputUrl}");
 
                 Task.Run(async () =>
                 {
@@ -79,41 +79,24 @@ public class H265TransportSubscriber : ITransportSubscriber
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Subscriber loop error: {ex.Message}");
+                        Console.WriteLine($"H.264 Subscriber loop error: {ex.Message}");
                     }
                 }, token);
 
-                started = true;
-                break;
+                return;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Subscriber connect attempt {i+1} failed: {ex.Message}");
+                Console.WriteLine($"H.264 Subscriber connect attempt {i+1} failed: {ex.Message}");
                 await Task.Delay(1000, token);
             }
-        }
-
-        if (!started)
-        {
-            Console.WriteLine("FFmpeg Subscriber failed to start after multiple attempts.");
         }
     }
 
     public async Task DisconnectAsync()
     {
         _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = null;
-
-        try
-        {
-            if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
-            {
-                _ffmpegProcess.Kill(true);
-            }
-        }
-        catch { }
-
+        try { if (_ffmpegProcess != null && !_ffmpegProcess.HasExited) _ffmpegProcess.Kill(true); } catch { }
         _ffmpegProcess?.Dispose();
         _ffmpegProcess = null;
         await Task.CompletedTask;

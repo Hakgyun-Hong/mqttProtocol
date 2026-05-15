@@ -15,6 +15,7 @@ using MqttPerfTestbench.Services.Mqtt;
 using MqttPerfTestbench.Services.Tcp;
 using MqttPerfTestbench.Services.Zmq;
 using MqttPerfTestbench.Services;
+using MqttPerfTestbench.Services.H264;
 using MqttPerfTestbench.Services.H265;
 
 namespace MqttPerfTestbench.ViewModels;
@@ -33,7 +34,7 @@ public partial class MainViewModel : ObservableObject
     private DateTime _lastTime;
 
     // Collections
-    public ObservableCollection<string> Protocols { get; } = new(new[] { "MQTT", "ZMQ", "gRPC", "TCP", "UDP", "H.265" });
+    public ObservableCollection<string> Protocols { get; } = new(new[] { "MQTT", "ZMQ", "gRPC", "TCP", "UDP", "H.264", "H.265" });
     public ObservableCollection<IDqcmPredictor> Predictors { get; } = new(new IDqcmPredictor[] { new DqcmNonePredictor(), new DqcmLeftPredictor(), new DqcmTopPredictor() });
     public ObservableCollection<IBlockCompressor> Compressors { get; } = new(new IBlockCompressor[] { new NoneCompressor(), new Lz4Compressor(), new ZstdCompressor(), new LzwCompressor() });
 
@@ -134,6 +135,10 @@ public partial class MainViewModel : ObservableObject
                 _publisher = new Services.Udp.UdpTransportPublisher();
                 _subscriber = new Services.Udp.UdpTransportSubscriber(_metrics);
                 break;
+            case "H.264":
+                _publisher = new H264TransportPublisher();
+                _subscriber = new H264TransportSubscriber(_metrics);
+                break;
             case "H.265":
                 _publisher = new H265TransportPublisher();
                 _subscriber = new H265TransportSubscriber(_metrics);
@@ -184,8 +189,8 @@ public partial class MainViewModel : ObservableObject
             }
 
             // Pipeline: 1. Generate Raw Data
-            int payloadBytes = SelectedProtocol == "H.265" 
-                ? ImageWidth * ImageHeight * 4 
+            int payloadBytes = (SelectedProtocol == "H.265" || SelectedProtocol == "H.264") 
+                ? ImageWidth * ImageHeight 
                 : PayloadSizeMb * 1024 * 1024;
             byte[] rawData = MemoryBufferPool.Rent(payloadBytes);
             Array.Fill(rawData, (byte)128); // dummy gray image
@@ -223,9 +228,9 @@ public partial class MainViewModel : ObservableObject
                 await _subscriber!.ConnectAsync(options);
                 await _publisher!.ConnectAsync(options);
             }
-            else if (SelectedProtocol == "H.265")
+            else if (SelectedProtocol == "H.265" || SelectedProtocol == "H.264")
             {
-                // H.265 Publisher is Listener (?listen=1), Subscriber is Connector
+                // H.264/H.265 Publisher is Listener (?listen=1), Subscriber is Connector
                 await _publisher!.ConnectAsync(options);
                 await Task.Delay(2000); // Wait longer for FFmpeg to start listening
                 await _subscriber!.ConnectAsync(options);
