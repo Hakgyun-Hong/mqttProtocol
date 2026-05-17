@@ -1,0 +1,95 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MqttPerfTestbench.Server.ViewModels"
+        x:Class="MqttPerfTestbench.Server.Views.PublisherWindow"
+        x:DataType="vm:PublisherViewModel"
+        Title="MqttPerf Server (Publisher)" Width="500" Height="750"
+        Background="#1e1e1e">
+
+    <Design.DataContext>
+        <vm:PublisherViewModel/>
+    </Design.DataContext>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="15">
+            <TextBlock Text="Performance Test Server" FontSize="24" FontWeight="Bold" Foreground="#4CAF50"/>
+            
+            <!-- 1. Server Lifecycle -->
+            <Border Background="#2d2d2d" Padding="15" CornerRadius="8">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Server Status Control" FontWeight="Bold" Foreground="#9e9e9e"/>
+                    <Grid ColumnDefinitions="*,2*" RowDefinitions="Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Protocol:" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Protocols}" 
+                                  SelectedItem="{Binding SelectedProtocol}" HorizontalAlignment="Stretch"
+                                  IsEnabled="{Binding !IsServerOpen}"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Port:" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Port}" Margin="0,5,0,0"
+                                      IsEnabled="{Binding !IsServerOpen}"/>
+                    </Grid>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,10,0,0">
+                        <Button Content="OPEN SERVER" Command="{Binding OpenServerCommand}" 
+                                Background="#4CAF50" Foreground="White" Width="150" HorizontalContentAlignment="Center"
+                                IsEnabled="{Binding !IsServerOpen}"/>
+                        <Button Content="CLOSE SERVER" Command="{Binding CloseServerCommand}" 
+                                Background="#F44336" Foreground="White" Width="150" HorizontalContentAlignment="Center"
+                                IsEnabled="{Binding IsServerOpen}"/>
+                    </StackPanel>
+                    
+                    <Border IsVisible="{Binding IsServerOpen}" Background="#1b5e20" CornerRadius="4" Padding="5">
+                        <TextBlock Text="SERVER IS READY" HorizontalAlignment="Center" FontWeight="Bold" FontSize="12"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. Publishing Control -->
+            <Border Background="#2d2d2d" Padding="15" CornerRadius="8" IsEnabled="{Binding IsServerOpen}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Publishing Control" FontWeight="Bold" Foreground="#9e9e9e"/>
+                    
+                    <Grid ColumnDefinitions="*,2*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Width:" VerticalAlignment="Center"/>
+                        <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding ImageWidth}"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Height:" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding ImageHeight}" Margin="0,5,0,0"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Target FPS:" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                        <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding TargetFps}" Margin="0,5,0,0"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Predictor:" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                        <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Predictors}" 
+                                  SelectedItem="{Binding SelectedPredictor}" HorizontalAlignment="Stretch" Margin="0,5,0,0"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Compressor:" VerticalAlignment="Center" Margin="0,5,0,0"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Compressors}" 
+                                  SelectedItem="{Binding SelectedCompressor}" HorizontalAlignment="Stretch" Margin="0,5,0,0"/>
+                    </Grid>
+
+                    <CheckBox Content="Use GPU Acceleration (NVENC)" IsChecked="{Binding UseGpu}" Margin="0,5"/>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,10">
+                        <Button Content="START PUBLISH" Command="{Binding StartPublishingCommand}" 
+                                Background="#2196F3" Foreground="White" Width="150" HorizontalContentAlignment="Center"
+                                IsEnabled="{Binding !IsPublishing}"/>
+                        <Button Content="STOP PUBLISH" Command="{Binding StopPublishingCommand}" 
+                                Background="#FF9800" Foreground="White" Width="150" HorizontalContentAlignment="Center"
+                                IsEnabled="{Binding IsPublishing}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 3. Stats -->
+            <Border Background="#1a1a1a" Padding="15" CornerRadius="8">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Processing Stats" FontWeight="Bold" Foreground="#9e9e9e"/>
+                    <TextBlock Text="{Binding PredictionTimeMs, StringFormat='Prediction: {0:F2} ms'}"/>
+                    <TextBlock Text="{Binding CompressionTimeMs, StringFormat='Compression: {0:F2} ms'}"/>
+                    <TextBlock Text="{Binding CompressedSizeMb, StringFormat='Payload Size: {0:F2} MB'}"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

@@ -1,0 +1,116 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MqttPerfTestbench.Client.ViewModels"
+        x:Class="MqttPerfTestbench.Client.Views.SubscriberWindow"
+        x:DataType="vm:SubscriberViewModel"
+        Title="Perf Testbench — Client (Subscriber)"
+        Width="480" Height="680"
+        Background="#141414">
+
+    <Design.DataContext><vm:SubscriberViewModel/></Design.DataContext>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="14">
+
+            <!-- ■ Header -->
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                <TextBlock Text="Performance Testbench" FontSize="22" FontWeight="Bold" Foreground="#E0E0E0"/>
+                <Border Grid.Column="1" CornerRadius="4" Padding="8,4"
+                        Background="#1565C0">
+                    <TextBlock Text="{Binding ConnectionStatus}" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                </Border>
+            </Grid>
+            <TextBlock Text="Client (Subscriber)" FontSize="13" Foreground="#616161" Margin="0,0,0,8"/>
+
+            <!-- ■ 1. Connection Settings -->
+            <Border Background="#1E1E1E" Padding="16" CornerRadius="8">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="① Connection Settings" FontWeight="SemiBold" Foreground="#BDBDBD" FontSize="13"/>
+
+                    <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Protocol" VerticalAlignment="Center" Foreground="#9E9E9E"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1"
+                                  ItemsSource="{Binding Protocols}"
+                                  SelectedItem="{Binding SelectedProtocol}"
+                                  IsEnabled="{Binding !IsRunning}"
+                                  HorizontalAlignment="Stretch"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Server IP" VerticalAlignment="Center" Foreground="#9E9E9E"/>
+                        <TextBox   Grid.Row="1" Grid.Column="1"
+                                   Text="{Binding ServerIp}"
+                                   IsEnabled="{Binding !IsRunning}"
+                                   Watermark="e.g. 192.168.1.100"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Port" VerticalAlignment="Center" Foreground="#9E9E9E"/>
+                        <NumericUpDown Grid.Row="2" Grid.Column="1"
+                                       Value="{Binding Port}"
+                                       Minimum="1" Maximum="65535"
+                                       IsEnabled="{Binding !IsRunning}"/>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12" Margin="0,8,0,0">
+                        <Button Content="  CONNECT  " Command="{Binding StartClientCommand}"
+                                Background="#1565C0" Foreground="White"
+                                IsEnabled="{Binding !IsRunning}"
+                                Padding="0,8" MinWidth="140" HorizontalContentAlignment="Center"/>
+                        <Button Content="  DISCONNECT  " Command="{Binding StopClientCommand}"
+                                Background="#C62828" Foreground="White"
+                                IsEnabled="{Binding IsRunning}"
+                                Padding="0,8" MinWidth="140" HorizontalContentAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ■ 2. Image Format -->
+            <Border Background="#1E1E1E" Padding="16" CornerRadius="8">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="② Image Format (must match server)" FontWeight="SemiBold" Foreground="#BDBDBD" FontSize="13"/>
+                    <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Width"  VerticalAlignment="Center" Foreground="#9E9E9E"/>
+                        <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding ImageWidth}"  Minimum="128" Maximum="16384" IsEnabled="{Binding !IsRunning}"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Height" VerticalAlignment="Center" Foreground="#9E9E9E"/>
+                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding ImageHeight}" Minimum="128" Maximum="16384" IsEnabled="{Binding !IsRunning}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ■ 3. Live Metrics -->
+            <Border Background="#1E1E1E" Padding="16" CornerRadius="8">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="③ Live Metrics" FontWeight="SemiBold" Foreground="#BDBDBD" FontSize="13"/>
+
+                    <Grid ColumnDefinitions="*,*,*">
+                        <!-- FPS -->
+                        <Border Grid.Column="0" Background="#121212" CornerRadius="6" Padding="12,10">
+                            <StackPanel HorizontalAlignment="Center" Spacing="4">
+                                <TextBlock Text="FPS" FontSize="11" Foreground="#757575" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding CurrentFps, StringFormat='{}{0:F1}'}"
+                                           FontSize="28" FontWeight="Bold" Foreground="#66BB6A" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Bandwidth -->
+                        <Border Grid.Column="1" Background="#121212" CornerRadius="6" Padding="12,10">
+                            <StackPanel HorizontalAlignment="Center" Spacing="4">
+                                <TextBlock Text="MB/s" FontSize="11" Foreground="#757575" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding CurrentBandwidthMb, StringFormat='{}{0:F1}'}"
+                                           FontSize="28" FontWeight="Bold" Foreground="#FFA726" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Latency -->
+                        <Border Grid.Column="2" Background="#121212" CornerRadius="6" Padding="12,10">
+                            <StackPanel HorizontalAlignment="Center" Spacing="4">
+                                <TextBlock Text="Latency ms" FontSize="11" Foreground="#757575" HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding AverageLatencyMs, StringFormat='{}{0:F1}'}"
+                                           FontSize="28" FontWeight="Bold" Foreground="#EF5350" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Window>
